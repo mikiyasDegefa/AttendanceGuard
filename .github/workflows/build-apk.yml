@@ -1,0 +1,82 @@
+name: Build AttendanceGuard APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "**" ]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    defaults:
+      run:
+        working-directory: ./
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.0'
+          channel: stable
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk --release --no-tree-shake-icons
+
+      - name: Rename APK
+        run: |
+          mkdir -p output
+          cp build/app/outputs/flutter-apk/app-release.apk \
+             output/AttendanceGuard-v${{ github.run_number }}.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AttendanceGuard-APK
+          path: output/AttendanceGuard-v${{ github.run_number }}.apk
+          retention-days: 60
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: AttendanceGuard v1.0.${{ github.run_number }}
+          body: |
+            ## AttendanceGuard APK
+
+            ### What's new in this build
+            - WiFi attendance tracking with SSID + MAC address verification
+            - Select WiFi from live scan (no manual typing)
+            - Tamper-proof attendance history (no delete)
+            - 3-person password protection for settings
+            - Late fine system (flat or per-minute, in ETB)
+            - Internet time (not device clock) for accuracy
+
+            ### How to install
+            1. Download **AttendanceGuard-v${{ github.run_number }}.apk** below
+            2. Copy it to your Android phone
+            3. **Settings → Security → Install unknown apps → Enable**
+            4. Open the APK → tap **Install**
+
+            > Built from commit `${{ github.sha }}`
+          files: output/AttendanceGuard-v${{ github.run_number }}.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
